@@ -13,11 +13,6 @@ import (
 
 var bot *tgbotapi.BotAPI
 
-type button struct {
-	name string
-	data string
-}
-
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -30,8 +25,7 @@ func main() {
 		log.Panic(err)
 	}
 
-	// bot.Debug = true
-
+	// create updates channel
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates := bot.GetUpdatesChan(u)
@@ -39,37 +33,20 @@ func main() {
 		log.Fatalf("Failed to start listening for updates %v", err)
 	}
 
+	// listen to updates from the channel
 	for update := range updates {
 		if update.CallbackQuery != nil {
-			cbHandler(update)
+			callbackHandler(update)
 		} else if update.Message.IsCommand() {
-			cmdHandler(update)
+			commandHandler(update)
 		} else {
 			log.Println("Unknown update")
 		}
 	}
 }
 
-func startMenu() tgbotapi.InlineKeyboardMarkup {
-	states := []button{
-		{
-			name: "Hello",
-			data: "hello",
-		},
-		{
-			name: "Goodbye",
-			data: "goodbye",
-		},
-	}
-
-	buttons := make([][]tgbotapi.InlineKeyboardButton, len(states))
-	for index, state := range states {
-		buttons[index] = tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData(state.name, state.data))
-	}
-
-	return tgbotapi.NewInlineKeyboardMarkup(buttons...)
-}
-
+// generate a slice of days padded on both sides
+// with 0 values for better visibility
 func genMonthDays(t time.Time) []int {
 	month := t.Month()
 	year := t.Year()
@@ -78,8 +55,13 @@ func genMonthDays(t time.Time) []int {
 	firstDayWeekday := firstDayOfMonth.Weekday() // Sun = 0, Mon = 1, etc
 	lastDayWeekday := lastDayOfMonth.Weekday()
 
-	res := []int{}
-	constantDays := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28}
+	res := make([]int, 0, 35) // max 5 * 7 = 35 cells
+	constantDays := []int{
+		1, 2, 3, 4, 5, 6, 7,
+		8, 9, 10, 11, 12, 13, 14,
+		15, 16, 17, 18, 19, 20, 21,
+		22, 23, 24, 25, 26, 27, 28,
+	}
 
 	for i := 1; i < int(firstDayWeekday); i++ {
 		res = append(res, 0)
@@ -123,13 +105,13 @@ func generateMonthlyCalendar(t time.Time) tgbotapi.InlineKeyboardMarkup {
 			if cells[dayIndex] != 0 {
 				text = fmt.Sprint(cells[dayIndex])
 				if cells[dayIndex] >= currDayOfMonth {
-					data = "date " + fmt.Sprint(cells[dayIndex])
+					data = "date " + t.Month().String() + " " + fmt.Sprint(cells[dayIndex])
 				} else {
-					data = "inactive"
+					data = "past"
 				}
 			} else {
 				text = " "
-				data = "inactive"
+				data = "none"
 			}
 			btn := tgbotapi.NewInlineKeyboardButtonData(text, data)
 			row = append(row, btn)
@@ -144,26 +126,23 @@ func generateWeekdayNames() []tgbotapi.InlineKeyboardButton {
 	weekdays := []tgbotapi.InlineKeyboardButton{}
 	dayNames := []string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"}
 	for i := range dayNames {
-		weekdays = append(weekdays, tgbotapi.NewInlineKeyboardButtonData(dayNames[i], "inactive"))
+		weekdays = append(weekdays, tgbotapi.NewInlineKeyboardButtonData(dayNames[i], "none"))
 	}
 	return weekdays
 }
 
-func cbHandler(update tgbotapi.Update) {
+func callbackHandler(update tgbotapi.Update) {
 	data := update.CallbackQuery.Data
 	chatId := update.CallbackQuery.From.ID
-	userName := update.CallbackQuery.From.UserName
 	var text string
+
 	switch {
-	case data == "hello":
-		text = fmt.Sprintf("Hello, %v", userName)
-	case data == "goodbye":
-		text = fmt.Sprintf("Goodbye, %v", userName)
-	case data == "inactive":
+	case strings.Fields(data)[0] == "none":
+	case strings.Fields(data)[0] == "past":
 		text = "Choose a valid date starting from today"
-	case strings.Contains(data, "date"):
-		month := time.Now().Month().String() // assuming current month is selected
-		day := strings.Fields(data)[1]
+	case strings.Fields(data)[0] == "date":
+		month := strings.Fields(data)[1]
+		day := strings.Fields(data)[2]
 		text = fmt.Sprintf("You have chosen: %s %s", month, day)
 	default:
 		text = "Unknown command"
@@ -172,24 +151,30 @@ func cbHandler(update tgbotapi.Update) {
 	sendMessage(msg)
 }
 
-func cmdHandler(update tgbotapi.Update) {
+func commandHandler(update tgbotapi.Update) {
 	command := update.Message.Command()
+	userName := update.Message.From.UserName
+	chatID := update.Message.Chat.ID
+	var msg tgbotapi.MessageConfig
+	msg.ChatID = chatID
+
 	switch command {
 	case "start":
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Select an action")
-		msg.ReplyMarkup = startMenu()
-		msg.ParseMode = "Markdown"
-		sendMessage(msg)
+		msg.Text = "Hello, " + userName
 	case "choosedate":
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Choose a date")
-		now := time.Now()
-		msg.ReplyMarkup = generateMonthlyCalendar(now)
+		msg.Text = "Choose a date"
+		msg.ReplyMarkup = generateMonthlyCalendar(time.Now())
 		msg.ParseMode = "Markdown"
-		sendMessage(msg)
+	case "choosetime": // TODO
+		msg.Text = "Not implemented yet"
+	case "changedate": // TODO
+		msg.Text = "Not implemented yet"
+	case "changetime": // TODO
+		msg.Text = "Not implemented yet"
 	default:
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Unknown command")
-		sendMessage(msg)
+		msg.Text = "Unknown command"
 	}
+	sendMessage(msg)
 }
 
 func sendMessage(msg tgbotapi.Chattable) {
