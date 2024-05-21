@@ -45,6 +45,25 @@ func main() {
 	}
 }
 
+func genHours() tgbotapi.InlineKeyboardMarkup {
+	var keyboard tgbotapi.InlineKeyboardMarkup
+
+	hourStrs := []string{
+		"10:00", "11:00", "12:00", "13:00",
+		"14:00", "15:00", "16:00", "17:00",
+		"18:00", "19:00", "20:00", "21:00",
+	}
+	// Generate 3 x 4 grid
+	for i := 0; i < 3; i++ {
+		row := []tgbotapi.InlineKeyboardButton{}
+		for j := i * 4; j < i*4+4; j++ {
+			row = append(row, tgbotapi.NewInlineKeyboardButtonData(hourStrs[j], "time "+hourStrs[j]))
+		}
+		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, row)
+	}
+	return keyboard
+}
+
 // generate a slice of days padded on both sides
 // with 0 values for better visibility
 func genMonthDays(t time.Time) []int {
@@ -134,21 +153,28 @@ func generateWeekdayNames() []tgbotapi.InlineKeyboardButton {
 func callbackHandler(update tgbotapi.Update) {
 	data := update.CallbackQuery.Data
 	chatId := update.CallbackQuery.From.ID
+	// userId := chatId // user ID and chat ID are the same in private chats
 	var text string
 
 	switch {
 	case strings.Fields(data)[0] == "none":
 	case strings.Fields(data)[0] == "past":
 		text = "Choose a valid date starting from today"
+		msg := tgbotapi.NewMessage(chatId, text)
+		sendMessage(msg)
 	case strings.Fields(data)[0] == "date":
 		month := strings.Fields(data)[1]
 		day := strings.Fields(data)[2]
-		text = fmt.Sprintf("You have chosen: %s %s", month, day)
+		text = fmt.Sprintf("Choose time slots for: %s %s", month, day)
+		msg := tgbotapi.NewMessage(chatId, text)
+		msg.ReplyMarkup = genHours()
+		sendMessage(msg)
 	default:
 		text = "Unknown command"
+		msg := tgbotapi.NewMessage(chatId, text)
+		sendMessage(msg)
 	}
-	msg := tgbotapi.NewMessage(chatId, text)
-	sendMessage(msg)
+
 }
 
 func commandHandler(update tgbotapi.Update) {
