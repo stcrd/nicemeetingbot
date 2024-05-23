@@ -1,4 +1,4 @@
-package nicemeetingbot
+package main
 
 import (
 	"fmt"

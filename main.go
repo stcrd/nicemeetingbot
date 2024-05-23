@@ -1,4 +1,4 @@
-package nicemeetingbot
+package main
 
 import (
 	"fmt"
@@ -9,7 +9,6 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
-	"github.com/stcrd/nicemeetingbot"
 )
 
 var bot *tgbotapi.BotAPI
@@ -79,13 +78,13 @@ func callbackHandler(update tgbotapi.Update) {
 		month := strings.Fields(data)[1]
 		day := strings.Fields(data)[2]
 		// TODO: implement toggling
-		updatedCalendar := nicemeetingbot.UpdateMonthlyCalendar(dateKeyboard, day)
+		updatedCalendar := UpdateMonthlyCalendar(dateKeyboard, day)
 		msg := tgbotapi.NewEditMessageReplyMarkup(chatId, msgId, updatedCalendar)
 		sendMessage(msg)
 
 		text = fmt.Sprintf("Choose time slots for: %s %s", month, day)
 		msg2 := tgbotapi.NewMessage(chatId, text)
-		msg2.ReplyMarkup = nicemeetingbot.GenHours()
+		msg2.ReplyMarkup = GenHours()
 		sendMessage(msg2)
 	default:
 		text = "Unknown command"
@@ -107,7 +106,7 @@ func commandHandler(update tgbotapi.Update) {
 		msg.Text = "Hello, " + userName
 	case "choosedate":
 		msg.Text = "__Choose a date__"
-		nicemeetingbot.GenerateMonthlyCalendar(time.Now(), &dateKeyboard)
+		GenerateMonthlyCalendar(time.Now(), &dateKeyboard)
 		msg.ReplyMarkup = dateKeyboard
 		msg.ParseMode = "MarkdownV2"
 	case "choosetime": // TODO
