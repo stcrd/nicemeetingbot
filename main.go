@@ -15,11 +15,11 @@ var bot *tgbotapi.BotAPI
 var dateKeyboard tgbotapi.InlineKeyboardMarkup
 
 type Record struct {
-	ChatID    string `validate:"required"`
-	UserID    string `validate:"required"`
-	Date      int    `validate:"required,gte=1,lte=31"`
-	BeginTime int    `validate:"required,gte=10,lte=21"`
-	EndTime   int    `validate:"required,gte=10,lte=21"`
+	ChatID    int64
+	UserName  string
+	Date      string
+	BeginTime int
+	EndTime   int
 }
 
 type CBData struct {
@@ -27,8 +27,10 @@ type CBData struct {
 	Value string `json:"value"` // date = YYYY-MM-DD, begin = HH, end = HH
 }
 
+var state = make(map[int64]map[string][]Record) // { chatID: []Record }
+
 func main() {
-	// load .env and get the token
+	// load .env and get the bot token
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -63,20 +65,39 @@ func main() {
 
 func callbackHandler(update tgbotapi.Update) {
 	data := update.CallbackQuery.Data
+	fmt.Println(data)
 	chatId := update.CallbackQuery.From.ID
+	userName := update.CallbackQuery.From.UserName
 	msgId := update.CallbackQuery.Message.MessageID
-	// userId := chatId // user ID and chat ID are the same in private chats
 	var text string
 
 	switch {
 	case strings.Fields(data)[0] == "none":
 	case strings.Fields(data)[0] == "past":
-		text = "Choose a valid date starting from today"
+	case data == "Choose date":
+		text := "Choose a date"
 		msg := tgbotapi.NewMessage(chatId, text)
+		dateKeyboard := GenerateMonthlyCalendar(time.Now())
+		msg.ReplyMarkup = dateKeyboard
+		msg.ParseMode = "MarkdownV2"
 		sendMessage(msg)
 	case strings.Fields(data)[0] == "date":
-		month := strings.Fields(data)[1]
-		day := strings.Fields(data)[2]
+		year := strings.Fields(data)[1]
+		month := strings.Fields(data)[2]
+		day := strings.Fields(data)[3]
+		if _, exists := state[chatId]; !exists {
+			state[chatId] = make(map[string][]Record)
+		}
+
+		if _, exists := state[chatId][userName]; !exists {
+			state[chatId][userName] = make([]Record, 0, 20)
+		}
+		// TODO: first check if that date already exists in the state
+		state[chatId][userName] = append(state[chatId][userName], Record{
+			ChatID:   chatId,
+			UserName: userName,
+			Date:     fmt.Sprintf("%s %s %s", year, month, day),
+		})
 		// TODO: implement toggling
 		updatedCalendar := UpdateMonthlyCalendar(dateKeyboard, day)
 		msg := tgbotapi.NewEditMessageReplyMarkup(chatId, msgId, updatedCalendar)
@@ -103,12 +124,10 @@ func commandHandler(update tgbotapi.Update) {
 
 	switch command {
 	case "start":
+		if _, exists := state[chatID][userName]; !exists {
+			msg.ReplyMarkup = GenInitialMenu()
+		}
 		msg.Text = "Hello, " + userName
-	case "choosedate":
-		msg.Text = "__Choose a date__"
-		GenerateMonthlyCalendar(time.Now(), &dateKeyboard)
-		msg.ReplyMarkup = dateKeyboard
-		msg.ParseMode = "MarkdownV2"
 	case "choosetime": // TODO
 		msg.Text = "Not implemented yet"
 	case "changedate": // TODO
@@ -126,3 +145,16 @@ func sendMessage(msg tgbotapi.Chattable) {
 		log.Panicf("Send message error: %v", err)
 	}
 }
+
+// func sendAutoDeletingMsg(msg tgbotapi.MessageConfig, delay time.Duration) {
+// 	sentMsg, err := bot.Send(msg)
+// 	if err != nil {
+// 		log.Panicf("Send message error: %v", err)
+// 	}
+// 	time.Sleep(delay * time.Second)
+// 	deleteConfig := tgbotapi.NewDeleteMessage(sentMsg.Chat.ID, sentMsg.MessageID)
+
+// 	if _, err := bot.Request(deleteConfig); err != nil {
+// 		log.Println("Error deleting message:", err)
+// 	}
+// }

@@ -7,17 +7,31 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func GenerateMonthlyCalendar(t time.Time, dateKeyboard *tgbotapi.InlineKeyboardMarkup) {
+var calendarCache = make(map[string]map[string]tgbotapi.InlineKeyboardMarkup) // { year: { month: calendar } }
+
+func GenerateMonthlyCalendar(t time.Time) tgbotapi.InlineKeyboardMarkup {
+	var dateKeyboard tgbotapi.InlineKeyboardMarkup
+	var text, data string
+	year := fmt.Sprint(t.Year())
+	month := t.Month().String()
+
+	// if already exists in the cache map, just return it
+	if monthCalendar, exists := calendarCache[year][month]; exists {
+		return monthCalendar
+	}
 	currDayOfMonth := t.Day()
 	cells := genMonthDays(t)
 	dayIndex := 0
-	var text string
-	var data string
 	rowCount := 5
 	columnCount := 7
 
-	firstRow := generateWeekdayNames()
-	dateKeyboard.InlineKeyboard = append(dateKeyboard.InlineKeyboard, firstRow)
+	// fill first row with weekday names
+	weekdays := []tgbotapi.InlineKeyboardButton{}
+	dayNames := []string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"}
+	for i := range dayNames {
+		weekdays = append(weekdays, tgbotapi.NewInlineKeyboardButtonData(dayNames[i], "none"))
+	}
+	dateKeyboard.InlineKeyboard = append(dateKeyboard.InlineKeyboard, weekdays)
 
 	for i := 0; i < rowCount; i++ {
 		row := []tgbotapi.InlineKeyboardButton{}
@@ -25,7 +39,7 @@ func GenerateMonthlyCalendar(t time.Time, dateKeyboard *tgbotapi.InlineKeyboardM
 			if cells[dayIndex] != 0 {
 				text = fmt.Sprint(cells[dayIndex])
 				if cells[dayIndex] >= currDayOfMonth {
-					data = "date " + t.Month().String() + " " + fmt.Sprint(cells[dayIndex])
+					data = fmt.Sprintf("date %s %s %s", year, month, text)
 				} else {
 					data = "past"
 				}
@@ -39,6 +53,11 @@ func GenerateMonthlyCalendar(t time.Time, dateKeyboard *tgbotapi.InlineKeyboardM
 		}
 		dateKeyboard.InlineKeyboard = append(dateKeyboard.InlineKeyboard, row)
 	}
+	if _, exists := calendarCache[year]; !exists {
+		calendarCache[year] = make(map[string]tgbotapi.InlineKeyboardMarkup)
+	}
+	calendarCache[year][month] = dateKeyboard
+	return dateKeyboard
 }
 
 func UpdateMonthlyCalendar(oldDateKeyboard tgbotapi.InlineKeyboardMarkup, date string) tgbotapi.InlineKeyboardMarkup {
@@ -47,7 +66,7 @@ func UpdateMonthlyCalendar(oldDateKeyboard tgbotapi.InlineKeyboardMarkup, date s
 		for j := 0; j < len(oldDateKeyboard.InlineKeyboard[i]); j++ {
 			if oldDateKeyboard.InlineKeyboard[i][j].Text == date {
 				prevText := oldDateKeyboard.InlineKeyboard[i][j].Text
-				oldDateKeyboard.InlineKeyboard[i][j].Text = "*" + prevText + "*"
+				oldDateKeyboard.InlineKeyboard[i][j].Text = prevText + "📌"
 				break
 			}
 		}
@@ -72,15 +91,6 @@ func GenHours() tgbotapi.InlineKeyboardMarkup {
 		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, row)
 	}
 	return keyboard
-}
-
-func generateWeekdayNames() []tgbotapi.InlineKeyboardButton {
-	weekdays := []tgbotapi.InlineKeyboardButton{}
-	dayNames := []string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"}
-	for i := range dayNames {
-		weekdays = append(weekdays, tgbotapi.NewInlineKeyboardButtonData(dayNames[i], "none"))
-	}
-	return weekdays
 }
 
 // generate a slice of days padded on both sides
@@ -122,4 +132,23 @@ func genMonthDays(t time.Time) []int {
 		res = append(res, 0)
 	}
 	return res
+}
+
+func GenInitialMenu() tgbotapi.InlineKeyboardMarkup {
+	dateRowBtnNames := []string{"Choose date", "Change date"}
+	timeRowBtnNames := []string{"Choose time", "Change time"}
+	var keyboard tgbotapi.InlineKeyboardMarkup
+	var dateRow, timeRow []tgbotapi.InlineKeyboardButton
+
+	for _, btn := range dateRowBtnNames {
+		dateRow = append(dateRow, tgbotapi.NewInlineKeyboardButtonData(btn, btn))
+	}
+
+	for _, btn := range timeRowBtnNames {
+		timeRow = append(timeRow, tgbotapi.NewInlineKeyboardButtonData(btn, btn))
+	}
+
+	keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, dateRow)
+	keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, timeRow)
+	return keyboard
 }
