@@ -9,6 +9,8 @@ import (
 
 var calendarCache = make(map[string]map[string]tgbotapi.InlineKeyboardMarkup) // { year: { month: calendar } }
 
+var BackBtn = tgbotapi.NewInlineKeyboardButtonData("Back", "Back")
+
 func GenerateMonthlyCalendar(t time.Time) tgbotapi.InlineKeyboardMarkup {
 	var dateKeyboard tgbotapi.InlineKeyboardMarkup
 	var text, data string
@@ -57,10 +59,12 @@ func GenerateMonthlyCalendar(t time.Time) tgbotapi.InlineKeyboardMarkup {
 		calendarCache[year] = make(map[string]tgbotapi.InlineKeyboardMarkup)
 	}
 	calendarCache[year][month] = dateKeyboard
+	dateKeyboard.InlineKeyboard = append(dateKeyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(BackBtn))
 	return dateKeyboard
 }
 
 func UpdateMonthlyCalendar(oldDateKeyboard tgbotapi.InlineKeyboardMarkup, date string) tgbotapi.InlineKeyboardMarkup {
+	fmt.Printf("oldDateKeyboard: %v\n", oldDateKeyboard.InlineKeyboard)
 	lng := len(oldDateKeyboard.InlineKeyboard)
 	for i := 0; i < lng; i++ {
 		for j := 0; j < len(oldDateKeyboard.InlineKeyboard[i]); j++ {
@@ -71,6 +75,7 @@ func UpdateMonthlyCalendar(oldDateKeyboard tgbotapi.InlineKeyboardMarkup, date s
 			}
 		}
 	}
+	oldDateKeyboard.InlineKeyboard = append(oldDateKeyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(BackBtn))
 	return oldDateKeyboard
 }
 
@@ -90,6 +95,7 @@ func GenHours() tgbotapi.InlineKeyboardMarkup {
 		}
 		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, row)
 	}
+	keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(BackBtn))
 	return keyboard
 }
 
@@ -135,20 +141,13 @@ func genMonthDays(t time.Time) []int {
 }
 
 func GenInitialMenu() tgbotapi.InlineKeyboardMarkup {
-	dateRowBtnNames := []string{"Choose date", "Change date"}
-	timeRowBtnNames := []string{"Choose time", "Change time"}
 	var keyboard tgbotapi.InlineKeyboardMarkup
-	var dateRow, timeRow []tgbotapi.InlineKeyboardButton
+	var firstRow []tgbotapi.InlineKeyboardButton
 
-	for _, btn := range dateRowBtnNames {
-		dateRow = append(dateRow, tgbotapi.NewInlineKeyboardButtonData(btn, btn))
-	}
+	var chooseDateBtn = tgbotapi.NewInlineKeyboardButtonData("Choose date", "Choose date")
 
-	for _, btn := range timeRowBtnNames {
-		timeRow = append(timeRow, tgbotapi.NewInlineKeyboardButtonData(btn, btn))
-	}
-
-	keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, dateRow)
-	keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, timeRow)
+	firstRow = append(firstRow, chooseDateBtn)
+	keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, firstRow)
+	keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(BackBtn))
 	return keyboard
 }
