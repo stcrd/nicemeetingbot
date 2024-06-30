@@ -36,7 +36,16 @@ type UserState struct {
 	TimeEnd string
 }
 
-var State = make(map[string]UserState)
+type ChatState struct {
+	UserStates map[string]UserState // map of userNames to UserStates
+}
+
+var State = make(map[int64]ChatState) // chatId > ChatState
+
+// generate updated keyboard based on the user state
+// func updateKeyboard(chatId int64, msgId int) tgbotapi.InlineKeyboardMarkup {
+// 		
+// }
 
 func callbackHandler(update tgbotapi.Update) {
 	fmt.Printf("%v\n", State)
@@ -61,7 +70,7 @@ func callbackHandler(update tgbotapi.Update) {
 		year := strings.Fields(data)[1]
 		month := strings.Fields(data)[2]
 		day := strings.Fields(data)[3]
-		State[userName] = UserState{
+		State[chatId].UserStates[userName] = UserState{
 			Date: fmt.Sprintf("%s %s %s", year, month, day),
 		}
 
@@ -94,14 +103,24 @@ func commandHandler(update tgbotapi.Update) {
 	var msg tgbotapi.MessageConfig
 	msg.ChatID = chatID
 
+	if _, exists := State[chatID]; !exists {
+		userStates := make(map[string]UserState)
+		State[chatID] = ChatState{UserStates: userStates}
+	}
+
+	if _, exists := State[chatID].UserStates[userName]; !exists {
+		State[chatID].UserStates[userName] = UserState{}
+	}
+
 	switch command {
 	case "start":
-		State[userName] = UserState{} // initiate the userName key in the map
+		State[chatID].UserStates[userName] = UserState{} // initiate the userName key in the map
 		msg.ReplyMarkup = GenInitialMenu()
 		msg.Text = "Hello, " + userName // should this also reset the user state?
 	case "reset":
-		State[userName] = UserState{}
-		msg.Text = "Your selection was reset"
+		State[chatID].UserStates[userName] = UserState{}
+		msg.ReplyMarkup = GenInitialMenu()
+		msg.Text = "Hello, " + userName // should this also reset the user state?
 	default:
 		msg.Text = "Unknown command"
 	}
