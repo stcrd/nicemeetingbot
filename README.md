@@ -1,8 +1,13 @@
 # **Backlog**
 
 - Kitsun
-    - [ ] Configure WebHook  
+    - [ ] Configure WebHook
+    - [ ] Разбор вебсервиса голанг  
 
 - stqrd
-    - [x] Task 1
+    - [ ] Deal with state
+    - [ ] Fix keyboard flow
+    - [ ] Fix time selection and 'Back' button
+
+-  
 
