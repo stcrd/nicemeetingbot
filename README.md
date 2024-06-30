@@ -4,5 +4,5 @@
     - [ ] Configure WebHook  
 
 - stqrd
-    - [ ] Task 1
+    - [x] Task 1
 
