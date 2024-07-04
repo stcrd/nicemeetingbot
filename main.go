@@ -17,8 +17,10 @@ TODOs:
 */
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -31,9 +33,9 @@ var bot *tgbotapi.BotAPI
 var dateKeyboard tgbotapi.InlineKeyboardMarkup
 
 type UserState struct {
-	Date string
+	Date      string
 	TimeStart string
-	TimeEnd string
+	TimeEnd   string
 }
 
 var State = make(map[string]UserState)
@@ -114,7 +116,24 @@ func sendMessage(msg tgbotapi.Chattable) {
 	}
 }
 
+type Jopa struct {
+	dermo string
+	sraka string
+}
+
 func main() {
+	//Web Init
+	var j Jopa
+	http.HandleFunc("/end", func(w http.ResponseWriter, r *http.Request) {
+		err := json.NewDecoder(r.Body).Decode(&j)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		fmt.Fprint(w, "Test")
+		fmt.Fprint(w, j)
+	})
+	http.ListenAndServe(":9001", nil)
 	// load .env and get the bot token
 	err := godotenv.Load()
 	if err != nil {
