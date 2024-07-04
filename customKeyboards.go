@@ -10,6 +10,7 @@ import (
 var calendarCache = make(map[string]map[string]tgbotapi.InlineKeyboardMarkup) // { year: { month: calendar } }
 
 var BackBtn = tgbotapi.NewInlineKeyboardButtonData("Back", "Back")
+var FwdBtn = tgbotapi.NewInlineKeyboardButtonData("Fwd", "Fwd")
 
 func GenerateMonthlyCalendar(t time.Time) tgbotapi.InlineKeyboardMarkup {
 	var dateKeyboard tgbotapi.InlineKeyboardMarkup
@@ -64,7 +65,6 @@ func GenerateMonthlyCalendar(t time.Time) tgbotapi.InlineKeyboardMarkup {
 }
 
 func UpdateMonthlyCalendar(oldDateKeyboard tgbotapi.InlineKeyboardMarkup, date string) tgbotapi.InlineKeyboardMarkup {
-	fmt.Printf("oldDateKeyboard: %v\n", oldDateKeyboard.InlineKeyboard)
 	lng := len(oldDateKeyboard.InlineKeyboard)
 	for i := 0; i < lng; i++ {
 		for j := 0; j < len(oldDateKeyboard.InlineKeyboard[i]); j++ {
@@ -143,11 +143,13 @@ func genMonthDays(t time.Time) []int {
 func GenInitialMenu() tgbotapi.InlineKeyboardMarkup {
 	var keyboard tgbotapi.InlineKeyboardMarkup
 	var firstRow []tgbotapi.InlineKeyboardButton
+	var secondRow []tgbotapi.InlineKeyboardButton
 
 	var chooseDateBtn = tgbotapi.NewInlineKeyboardButtonData("Choose date", "Choose date")
 
 	firstRow = append(firstRow, chooseDateBtn)
+	secondRow = append(secondRow, BackBtn, FwdBtn)
 	keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, firstRow)
-	keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, tgbotapi.NewInlineKeyboardRow(BackBtn))
+	keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, secondRow)
 	return keyboard
 }

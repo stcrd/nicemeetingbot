@@ -13,6 +13,7 @@ TODOs:
 2 - Make two time keyboards, for start and end: add timeStart and timeEnd instead of time in the data?
 3 - Deal with back button: maintain the state of the selection process?
 4 - Last keyboard with 'Confirm' and 'Change' buttons?
+5 - Fix adding back and forward buttons, maybe make it like a footer
 
 */
 
@@ -69,17 +70,16 @@ func updateKeyboard(chatID int64, msgID int, userName string) tgbotapi.InlineKey
 }
 
 func callbackHandler(update tgbotapi.Update) {
-	fmt.Printf("%v\n", State)
+	fmt.Printf("%+v\n", State)
 	data := update.CallbackQuery.Data
-	fmt.Println(data)
 	chatId := update.CallbackQuery.From.ID
 	userName := update.CallbackQuery.From.UserName
 	msgId := update.CallbackQuery.Message.MessageID
 	var text string
 
 	switch {
-	case strings.Fields(data)[0] == "none":
-	case strings.Fields(data)[0] == "past":
+	case strings.Fields(data)[0] == "none": // handling this case to make buttons inactive
+	case strings.Fields(data)[0] == "past": // handling this case to make buttons inactive
 	case data == "Choose date":
 		text := "Choose a date"
 		msg := tgbotapi.NewMessage(chatId, text)
@@ -97,7 +97,6 @@ func callbackHandler(update tgbotapi.Update) {
 
 		// TODO: implement toggling
 		updatedCalendar := UpdateMonthlyCalendar(dateKeyboard, day)
-		fmt.Printf("updatedCalendar: %v\n", updatedCalendar.InlineKeyboard)
 		msg := tgbotapi.NewEditMessageReplyMarkup(chatId, msgId, updatedCalendar)
 		sendMessage(msg)
 
@@ -109,6 +108,8 @@ func callbackHandler(update tgbotapi.Update) {
 		fmt.Println("Time field pressed")
 	case strings.Fields(data)[0] == "Back":
 		fmt.Println("Back button pressed")
+	case strings.Fields(data)[0] == "Fwd":
+		fmt.Println("Forward button pressed")
 	default:
 		text = "Unknown command"
 		msg := tgbotapi.NewMessage(chatId, text)
@@ -133,15 +134,11 @@ func commandHandler(update tgbotapi.Update) {
 		State[chatID].UserStates[userName] = UserState{}
 	}
 
-	switch command {
-	case "start":
+	switch  {
+	case command == "start" || command == "reset":
 		State[chatID].UserStates[userName] = UserState{} // initiate the userName key in the map
 		msg.ReplyMarkup = GenInitialMenu()
-		msg.Text = "Hello, " + userName // should this also reset the user state?
-	case "reset":
-		State[chatID].UserStates[userName] = UserState{}
-		msg.ReplyMarkup = GenInitialMenu()
-		msg.Text = "Hello, " + userName // should this also reset the user state?
+		msg.Text = "Choose a date"
 	default:
 		msg.Text = "Unknown command"
 	}
