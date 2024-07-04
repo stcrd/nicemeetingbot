@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"errors"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
@@ -42,10 +43,30 @@ type ChatState struct {
 
 var State = make(map[int64]ChatState) // chatId > ChatState
 
+func GetUserState(chatID int64, userName string) (UserState, error) {
+	chatState, exists := State[chatID]
+	if !exists {
+		return UserState{}, errors.New("ChatID does not exist in the State")
+	}
+
+	userState, exists :=chatState.UserStates[userName]
+	if !exists {
+		return UserState{}, errors.New("Username does not exist in this chat")
+	}
+	return userState, nil
+}
+
 // generate updated keyboard based on the user state
-// func updateKeyboard(chatId int64, msgId int) tgbotapi.InlineKeyboardMarkup {
-// 		
-// }
+func updateKeyboard(chatID int64, msgID int, userName string) tgbotapi.InlineKeyboardMarkup {
+	userState, err := GetUserState(chatID, userName)
+	if err != nil || (userState.Date == "" && userState.TimeStart == "" && userState.TimeEnd == "") {
+		updatedMsg := GenInitialMenu()
+		msg := tgbotapi.NewEditMessageReplyMarkup(chatID, msgID, updatedMsg)
+		sendMessage(msg)
+	}
+
+	return tgbotapi.InlineKeyboardMarkup{}
+}
 
 func callbackHandler(update tgbotapi.Update) {
 	fmt.Printf("%v\n", State)
