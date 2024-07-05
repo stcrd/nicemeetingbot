@@ -118,10 +118,28 @@ func sendMessage(msg tgbotapi.Chattable) {
 }
 
 type Jopa struct {
-	dermo string
-	sraka string
+	Dermo string `json:"dermo"`
+	Sraka string `json:"sraka"`
 }
 
+func WebHookTest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+		return
+	}
+	defer r.Body.Close()
+	var webhook_update Jopa
+	if err := json.Unmarshal(body, &webhook_update); err != nil {
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+	fmt.Fprint(w, webhook_update)
+}
 func WebhookUpdate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -149,6 +167,7 @@ func WebhookUpdate(w http.ResponseWriter, r *http.Request) {
 func main() {
 	//Web Init
 	http.HandleFunc("/webhookupdate", WebhookUpdate)
+	http.HandleFunc("/webhooktest", WebHookTest)
 	http.ListenAndServe(":9001", nil)
 	// load .env and get the bot token
 	err := godotenv.Load()
