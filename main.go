@@ -19,6 +19,7 @@ TODOs:
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -121,18 +122,33 @@ type Jopa struct {
 	sraka string
 }
 
+func WebhookUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+		return
+	}
+	defer r.Body.Close()
+	var webhook_update tgbotapi.Update
+	if err := json.Unmarshal(body, &webhook_update); err != nil {
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+	if webhook_update.CallbackQuery != nil {
+		callbackHandler(webhook_update)
+	} else if webhook_update.Message.IsCommand() {
+		commandHandler(webhook_update)
+	} else {
+		log.Println("Unknown update")
+	}
+}
 func main() {
 	//Web Init
-	var j Jopa
-	http.HandleFunc("/end", func(w http.ResponseWriter, r *http.Request) {
-		err := json.NewDecoder(r.Body).Decode(&j)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		fmt.Fprint(w, "Test")
-		fmt.Fprint(w, j)
-	})
+	http.HandleFunc("/webhookupdate", WebhookUpdate)
 	http.ListenAndServe(":9001", nil)
 	// load .env and get the bot token
 	err := godotenv.Load()
@@ -145,24 +161,5 @@ func main() {
 	bot, err = tgbotapi.NewBotAPI(tgToken)
 	if err != nil {
 		log.Panic(err)
-	}
-
-	// create updates channel
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-	updates := bot.GetUpdatesChan(u)
-	if err != nil {
-		log.Fatalf("Failed to start listening for updates %v", err)
-	}
-
-	// listen to updates from the channel
-	for update := range updates {
-		if update.CallbackQuery != nil {
-			callbackHandler(update)
-		} else if update.Message.IsCommand() {
-			commandHandler(update)
-		} else {
-			log.Println("Unknown update")
-		}
 	}
 }
