@@ -153,3 +153,7 @@ func GenInitialMenu() tgbotapi.InlineKeyboardMarkup {
 	keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, secondRow)
 	return keyboard
 }
+
+func GenCurrentMsg(currUserState UserState) {
+
+}
