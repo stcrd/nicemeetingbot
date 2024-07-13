@@ -1,0 +1,31 @@
+```mermaid
+stateDiagram
+    state "Initial" as Initial
+    state "Date selected" as DateSelected
+    state "Start time selected" as StartTimeSelected
+    state "End time selected" as EndTimeSelected
+    state "Reviewing" as Reviewing
+    state "Confirmed" as Confirmed
+    state "Meeting time set" as MeetingTimeSet
+
+    [*] --> Initial
+    Initial --> DateSelected : Date value button selected/pressed
+    DateSelected --> Initial : Back button pressed
+    DateSelected --> StartTimeSelected : Time value button selected
+    StartTimeSelected --> DateSelected : Back button pressed
+    StartTimeSelected --> EndTimeSelected : Time value button selected
+    EndTimeSelected --> StartTimeSelected : Back button pressed
+    EndTimeSelected --> Reviewing : Time value button selected
+    Reviewing --> EndTimeSelected : Back button pressed
+    Reviewing --> Confirmed : Confirm button pressed
+    Confirmed --> Reviewing : Back button pressed
+    Confirmed --> MeetingTimeSet : 'Meeting ready' message from back end
+
+    Initial --> Initial : Reset button pressed
+    DateSelected --> Initial : Reset button pressed
+    StartTimeSelected --> Initial : Reset button pressed
+    EndTimeSelected --> Initial : Reset button pressed
+    Reviewing --> Initial : Reset button pressed
+    Confirmed --> Initial : Reset button pressed
+    MeetingTimeSet --> Initial : Reset button pressed
+```
