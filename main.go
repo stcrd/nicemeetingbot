@@ -22,7 +22,6 @@ import (
 	"log"
 	"os"
 	"strings"
-	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
@@ -35,6 +34,7 @@ type UserState struct {
 	Date string
 	TimeStart string
 	TimeEnd string
+	Confirmation string
 }
 
 type ChatState struct {
@@ -65,47 +65,46 @@ func genKeyboard(chatID int64, msgID int, userName string) tgbotapi.InlineKeyboa
 func callbackHandler(update tgbotapi.Update) {
 	fmt.Printf("%+v\n", State)
 	data := update.CallbackQuery.Data
-	chatId := update.CallbackQuery.From.ID
+	chatID := update.CallbackQuery.From.ID
 	userName := update.CallbackQuery.From.UserName
-	msgId := update.CallbackQuery.Message.MessageID
+	msgID := update.CallbackQuery.Message.MessageID
 	var text string
+	var msg tgbotapi.MessageConfig
+	msg.ChatID = chatID
 
 	switch {
 	case strings.Fields(data)[0] == "none": // handling this case to make buttons inactive
 	case strings.Fields(data)[0] == "past": // handling this case to make buttons inactive
-	case data == "Choose date":
-		text := "Choose a date"
-		msg := tgbotapi.NewMessage(chatId, text)
-		dateKeyboard := GenerateMonthlyCalendar(time.Now())
-		msg.ReplyMarkup = dateKeyboard
-		msg.ParseMode = "MarkdownV2"
-		sendMessage(msg)
 	case strings.Fields(data)[0] == "date":
 		year := strings.Fields(data)[1]
 		month := strings.Fields(data)[2]
 		day := strings.Fields(data)[3]
-		State[chatId].UserStates[userName] = UserState{
+		State[chatID].UserStates[userName] = UserState{
 			Date: fmt.Sprintf("%s %s %s", year, month, day),
 		}
-
-		// TODO: implement toggling
-		updatedCalendar := UpdateMonthlyCalendar(dateKeyboard, day)
-		msg := tgbotapi.NewEditMessageReplyMarkup(chatId, msgId, updatedCalendar)
+		msg.Text, msg.ReplyMarkup = GenCurrentMsg(State[chatID].UserStates[userName], msgID, chatID)
 		sendMessage(msg)
-
-		text = fmt.Sprintf("Choose time slots for: %s %s", month, day)
-		msg2 := tgbotapi.NewMessage(chatId, text)
-		msg2.ReplyMarkup = GenHours()
-		sendMessage(msg2)
-	case strings.Fields(data)[0] == "time":
-		fmt.Println("Time field pressed")
+	case strings.Fields(data)[0] == "timestart":
+		timeStart := strings.Fields(data)[1]
+		userState := State[chatID].UserStates[userName]
+		userState.TimeStart = timeStart
+		State[chatID].UserStates[userName] = userState
+		msg.Text, msg.ReplyMarkup = GenCurrentMsg(State[chatID].UserStates[userName], msgID, chatID)
+		sendMessage(msg)	
+	case strings.Fields(data)[0] == "timeend":
+		timeEnd := strings.Fields(data)[1]
+		userState := State[chatID].UserStates[userName]
+		userState.TimeEnd = timeEnd
+		State[chatID].UserStates[userName] = userState
+		msg.Text, msg.ReplyMarkup = GenCurrentMsg(State[chatID].UserStates[userName], msgID, chatID)
+		sendMessage(msg)	
 	case strings.Fields(data)[0] == "Back":
 		fmt.Println("Back button pressed")
 	case strings.Fields(data)[0] == "Fwd":
 		fmt.Println("Forward button pressed")
 	default:
 		text = "Unknown command"
-		msg := tgbotapi.NewMessage(chatId, text)
+		msg := tgbotapi.NewMessage(chatID, text)
 		sendMessage(msg)
 	}
 
@@ -115,6 +114,7 @@ func commandHandler(update tgbotapi.Update) {
 	command := update.Message.Command()
 	userName := update.Message.From.UserName
 	chatID := update.Message.Chat.ID
+	msgID := update.Message.MessageID
 	var msg tgbotapi.MessageConfig
 	msg.ChatID = chatID
 
@@ -123,8 +123,7 @@ func commandHandler(update tgbotapi.Update) {
 		userStates := make(map[string]UserState)
 		State[chatID] = ChatState{UserStates: userStates}
 		State[chatID].UserStates[userName] = UserState{} // initiate the userName key in the map
-		msg.Text = "Welcome!"
-		msg.ReplyMarkup = genKeyboard(chatID, 0, userName)
+		msg.Text, msg.ReplyMarkup = GenCurrentMsg(State[chatID].UserStates[userName], msgID, chatID)
 	default:
 		msg.Text = "Unknown command"
 	}
