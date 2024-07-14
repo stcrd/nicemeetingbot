@@ -23,7 +23,6 @@ import (
 	"os"
 	"strings"
 	"time"
-	"errors"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
@@ -44,27 +43,21 @@ type ChatState struct {
 
 var State = make(map[int64]ChatState) // chatId > ChatState
 
-func GetUserState(chatID int64, userName string) (UserState, error) {
-	chatState, exists := State[chatID]
-	if !exists {
-		return UserState{}, errors.New("ChatID does not exist in the State")
-	}
-
-	userState, exists :=chatState.UserStates[userName]
-	if !exists {
-		return UserState{}, errors.New("Username does not exist in this chat")
-	}
-	return userState, nil
+func GetUserState(chatID int64, userName string) UserState {
+	return State[chatID].UserStates[userName]
 }
 
 // generate updated keyboard based on the user state
-func updateKeyboard(chatID int64, msgID int, userName string) tgbotapi.InlineKeyboardMarkup {
-	userState, err := GetUserState(chatID, userName)
-	if err != nil || (userState.Date == "" && userState.TimeStart == "" && userState.TimeEnd == "") {
-		updatedMsg := GenInitialMenu()
-		msg := tgbotapi.NewEditMessageReplyMarkup(chatID, msgID, updatedMsg)
-		sendMessage(msg)
+func genKeyboard(chatID int64, msgID int, userName string) tgbotapi.InlineKeyboardMarkup {
+	var msg tgbotapi.MessageConfig
+	msg.ChatID = chatID
+	// userState := GetUserState(chatID, userName)
+
+	// msgID equals 0 only after start or reset command
+	if msgID == 0 {
+		return GenInitialMenu()
 	}
+	fmt.Println(chatID, msgID, userName)
 
 	return tgbotapi.InlineKeyboardMarkup{}
 }
@@ -125,20 +118,13 @@ func commandHandler(update tgbotapi.Update) {
 	var msg tgbotapi.MessageConfig
 	msg.ChatID = chatID
 
-	if _, exists := State[chatID]; !exists {
-		userStates := make(map[string]UserState)
-		State[chatID] = ChatState{UserStates: userStates}
-	}
-
-	if _, exists := State[chatID].UserStates[userName]; !exists {
-		State[chatID].UserStates[userName] = UserState{}
-	}
-
 	switch  {
 	case command == "start" || command == "reset":
+		userStates := make(map[string]UserState)
+		State[chatID] = ChatState{UserStates: userStates}
 		State[chatID].UserStates[userName] = UserState{} // initiate the userName key in the map
-		msg.ReplyMarkup = GenInitialMenu()
-		msg.Text = "Choose a date"
+		msg.Text = "Welcome!"
+		msg.ReplyMarkup = genKeyboard(chatID, 0, userName)
 	default:
 		msg.Text = "Unknown command"
 	}
