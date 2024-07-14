@@ -150,39 +150,34 @@ func GenInitialMenu() tgbotapi.InlineKeyboardMarkup {
 	return keyboard
 }
 
-func GenCurrentMsg(currUserState UserState, msgID int, chatID int64) (string, tgbotapi.InlineKeyboardMarkup) {
-	var msgText string
+func GenCurrentMsg(currUserState UserState) (string, tgbotapi.InlineKeyboardMarkup) {
 	var keyboard tgbotapi.InlineKeyboardMarkup
+	var msgText string
 	if currUserState.Date == "" {
 		year := fmt.Sprint(time.Now().Year())
 		month := time.Now().Month().String()
 		msgText = month + " " + year
 		keyboard = GenerateMonthlyCalendar(time.Now())
 		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, Footer)
-		return msgText, keyboard
-	}
-	if currUserState.TimeStart == "" {
+	} else if currUserState.TimeStart == "" {
 		msgText = "Choose starting time"
 		keyboard = GenHours("start")
 		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, Footer)
-		return msgText, keyboard
-	}
-	if currUserState.TimeEnd == "" {
+	} else if currUserState.TimeEnd == "" {
 		msgText = "Choose ending time"
 		keyboard = GenHours("end")
 		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, Footer)
-		return msgText, keyboard
-	}
-	if currUserState.Confirmation == "" {
+	} else if currUserState.Confirmation == "" {
 		msgText = "Your selection"
 		dateRow := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Date: " + currUserState.Date, "none"))
 		startTimeRow := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Starting time: " + currUserState.TimeStart, "none"))
 		endTimeRow := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Ending time: " + currUserState.TimeEnd, "none"))
+		confirmButtonRow := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Confirm", "confirm"))
 		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, dateRow)
 		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, startTimeRow)
 		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, endTimeRow)
+		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, confirmButtonRow)
 		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, Footer)
-		return msgText, keyboard
 	}
-	return "", tgbotapi.NewInlineKeyboardMarkup()
+	return msgText, keyboard
 }

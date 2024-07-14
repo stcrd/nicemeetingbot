@@ -71,50 +71,45 @@ func callbackHandler(update tgbotapi.Update) {
 	var text string
 	var msg tgbotapi.MessageConfig
 	msg.ChatID = chatID
+	firstPart := strings.Fields(data)[0]
 
 	switch {
-	case strings.Fields(data)[0] == "none": // handling this case to make buttons inactive
-	case strings.Fields(data)[0] == "past": // handling this case to make buttons inactive
-	case strings.Fields(data)[0] == "date":
+	case firstPart == "none": // handling this case to make buttons inactive
+	case firstPart == "past": // handling this case to make buttons inactive
+	case firstPart == "date":
 		year := strings.Fields(data)[1]
 		month := strings.Fields(data)[2]
 		day := strings.Fields(data)[3]
 		State[chatID].UserStates[userName] = UserState{
 			Date: fmt.Sprintf("%s %s %s", year, month, day),
 		}
-		msg.Text, msg.ReplyMarkup = GenCurrentMsg(State[chatID].UserStates[userName], msgID, chatID)
-		sendMessage(msg)
-	case strings.Fields(data)[0] == "timestart":
+	case firstPart == "timestart":
 		timeStart := strings.Fields(data)[1]
 		userState := State[chatID].UserStates[userName]
 		userState.TimeStart = timeStart
 		State[chatID].UserStates[userName] = userState
-		msg.Text, msg.ReplyMarkup = GenCurrentMsg(State[chatID].UserStates[userName], msgID, chatID)
-		sendMessage(msg)	
-	case strings.Fields(data)[0] == "timeend":
+	case firstPart == "timeend":
 		timeEnd := strings.Fields(data)[1]
 		userState := State[chatID].UserStates[userName]
 		userState.TimeEnd = timeEnd
 		State[chatID].UserStates[userName] = userState
-		msg.Text, msg.ReplyMarkup = GenCurrentMsg(State[chatID].UserStates[userName], msgID, chatID)
-		sendMessage(msg)	
-	case strings.Fields(data)[0] == "Back":
+	case firstPart == "Back":
 		fmt.Println("Back button pressed")
-	case strings.Fields(data)[0] == "Fwd":
-		fmt.Println("Forward button pressed")
 	default:
 		text = "Unknown command"
 		msg := tgbotapi.NewMessage(chatID, text)
 		sendMessage(msg)
 	}
-
+	newText, newKeyboard :=  GenCurrentMsg(State[chatID].UserStates[userName])
+	newMsg := tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, newText, newKeyboard)
+	sendMessage(newMsg)
 }
 
 func commandHandler(update tgbotapi.Update) {
 	command := update.Message.Command()
 	userName := update.Message.From.UserName
 	chatID := update.Message.Chat.ID
-	msgID := update.Message.MessageID
+	// msgID := update.Message.MessageID
 	var msg tgbotapi.MessageConfig
 	msg.ChatID = chatID
 
@@ -123,11 +118,13 @@ func commandHandler(update tgbotapi.Update) {
 		userStates := make(map[string]UserState)
 		State[chatID] = ChatState{UserStates: userStates}
 		State[chatID].UserStates[userName] = UserState{} // initiate the userName key in the map
-		msg.Text, msg.ReplyMarkup = GenCurrentMsg(State[chatID].UserStates[userName], msgID, chatID)
+		newText, newKeyboard := GenCurrentMsg(State[chatID].UserStates[userName])
+		msg.Text = newText
+		msg.ReplyMarkup = newKeyboard
+		sendMessage(msg)
 	default:
-		msg.Text = "Unknown command"
+		sendMessage(tgbotapi.NewMessage(chatID, "Unknown command"))
 	}
-	sendMessage(msg)
 }
 
 func sendMessage(msg tgbotapi.Chattable) {
