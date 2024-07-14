@@ -63,7 +63,6 @@ func genKeyboard(chatID int64, msgID int, userName string) tgbotapi.InlineKeyboa
 }
 
 func callbackHandler(update tgbotapi.Update) {
-	fmt.Printf("%+v\n", State)
 	data := update.CallbackQuery.Data
 	chatID := update.CallbackQuery.From.ID
 	userName := update.CallbackQuery.From.UserName
@@ -94,7 +93,20 @@ func callbackHandler(update tgbotapi.Update) {
 		userState.TimeEnd = timeEnd
 		State[chatID].UserStates[userName] = userState
 	case firstPart == "Back":
-		fmt.Println("Back button pressed")
+		userState := State[chatID].UserStates[userName]
+		if userState.Confirmation == "confirmed" {
+			userState.Confirmation = ""
+			State[chatID].UserStates[userName] = userState
+		} else if userState.TimeEnd != "" {
+			userState.TimeEnd = ""
+			State[chatID].UserStates[userName] = userState
+		} else if userState.TimeStart != "" {
+			userState.TimeStart = ""
+			State[chatID].UserStates[userName] = userState
+		} else if userState.Date != "" {
+			userState.Date = ""
+			State[chatID].UserStates[userName] = userState
+		}
 	default:
 		text = "Unknown command"
 		msg := tgbotapi.NewMessage(chatID, text)
@@ -103,6 +115,7 @@ func callbackHandler(update tgbotapi.Update) {
 	newText, newKeyboard :=  GenCurrentMsg(State[chatID].UserStates[userName])
 	newMsg := tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, newText, newKeyboard)
 	sendMessage(newMsg)
+	fmt.Printf("%+v\n", State)
 }
 
 func commandHandler(update tgbotapi.Update) {
