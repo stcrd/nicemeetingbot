@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"time"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -10,7 +11,7 @@ import (
  // { year: { month: calendar } }
 var calendarCache = make(map[string]map[string]tgbotapi.InlineKeyboardMarkup)
 
-var BackBtn = tgbotapi.NewInlineKeyboardButtonData("Back", "Back")
+var BackBtn = tgbotapi.NewInlineKeyboardButtonData("Back", "back")
 var Footer = tgbotapi.NewInlineKeyboardRow(BackBtn)
 
 func GenerateMonthlyCalendar(t time.Time) tgbotapi.InlineKeyboardMarkup {
@@ -45,7 +46,7 @@ func GenerateMonthlyCalendar(t time.Time) tgbotapi.InlineKeyboardMarkup {
 				if cells[dayIndex] >= currDayOfMonth {
 					data = fmt.Sprintf("date %s %s %s", year, month, text)
 				} else {
-					data = "past"
+					data = "none"
 				}
 			} else {
 				text = " "
@@ -158,26 +159,29 @@ func GenCurrentMsg(currUserState UserState) (string, tgbotapi.InlineKeyboardMark
 		month := time.Now().Month().String()
 		msgText = month + " " + year
 		keyboard = GenerateMonthlyCalendar(time.Now())
-		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, Footer)
 	} else if currUserState.TimeStart == "" {
 		msgText = "Choose starting time"
 		keyboard = GenHours("start")
-		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, Footer)
 	} else if currUserState.TimeEnd == "" {
 		msgText = "Choose ending time"
 		keyboard = GenHours("end")
-		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, Footer)
 	} else if currUserState.Confirmation == "" {
 		msgText = "Your selection"
-		dateRow := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Date: " + currUserState.Date, "none"))
-		startTimeRow := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Starting time: " + currUserState.TimeStart, "none"))
-		endTimeRow := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Ending time: " + currUserState.TimeEnd, "none"))
+		day := strings.Fields(currUserState.Date)[2]
+		month := strings.Fields(currUserState.Date)[1]
+		year := strings.Fields(currUserState.Date)[0]
+		dateBtn := tgbotapi.NewInlineKeyboardButtonData(day + " " + month + " " + year, "none")
+		intervalBtn := tgbotapi.NewInlineKeyboardButtonData(currUserState.TimeStart + " ... " + currUserState.TimeEnd, "none")
+		dateAndTimeRow := tgbotapi.NewInlineKeyboardRow(dateBtn, intervalBtn)
 		confirmButtonRow := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Confirm", "confirm"))
-		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, dateRow)
-		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, startTimeRow)
-		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, endTimeRow)
+		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, dateAndTimeRow)
 		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, confirmButtonRow)
-		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, Footer)
+	} else if currUserState.Confirmation == "confirmed" {
+		msgText = "Waiting for other participants..."	
+		hourglassBtn := tgbotapi.NewInlineKeyboardButtonData("⏳🤖⏳", "none")
+		hourglassRow := tgbotapi.NewInlineKeyboardRow(hourglassBtn)
+		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, hourglassRow)
 	}
+	keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, Footer)
 	return msgText, keyboard
 }

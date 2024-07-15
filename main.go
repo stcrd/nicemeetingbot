@@ -71,28 +71,28 @@ func callbackHandler(update tgbotapi.Update) {
 	var msg tgbotapi.MessageConfig
 	msg.ChatID = chatID
 	firstPart := strings.Fields(data)[0]
+	oldState := State[chatID].UserStates[userName]
 
-	switch {
-	case firstPart == "none": // handling this case to make buttons inactive
-	case firstPart == "past": // handling this case to make buttons inactive
-	case firstPart == "date":
+	switch firstPart {
+	case "none": // handling this case to make buttons inactive
+	case "date":
 		year := strings.Fields(data)[1]
 		month := strings.Fields(data)[2]
 		day := strings.Fields(data)[3]
 		State[chatID].UserStates[userName] = UserState{
 			Date: fmt.Sprintf("%s %s %s", year, month, day),
 		}
-	case firstPart == "timestart":
+	case "timestart":
 		timeStart := strings.Fields(data)[1]
 		userState := State[chatID].UserStates[userName]
 		userState.TimeStart = timeStart
 		State[chatID].UserStates[userName] = userState
-	case firstPart == "timeend":
+	case "timeend":
 		timeEnd := strings.Fields(data)[1]
 		userState := State[chatID].UserStates[userName]
 		userState.TimeEnd = timeEnd
 		State[chatID].UserStates[userName] = userState
-	case firstPart == "Back":
+	case "back":
 		userState := State[chatID].UserStates[userName]
 		if userState.Confirmation == "confirmed" {
 			userState.Confirmation = ""
@@ -107,14 +107,20 @@ func callbackHandler(update tgbotapi.Update) {
 			userState.Date = ""
 			State[chatID].UserStates[userName] = userState
 		}
+	case "confirm":
+		userState := State[chatID].UserStates[userName]
+		userState.Confirmation = "confirmed"
+		State[chatID].UserStates[userName] = userState
 	default:
 		text = "Unknown command"
 		msg := tgbotapi.NewMessage(chatID, text)
 		sendMessage(msg)
 	}
-	newText, newKeyboard :=  GenCurrentMsg(State[chatID].UserStates[userName])
-	newMsg := tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, newText, newKeyboard)
-	sendMessage(newMsg)
+	if State[chatID].UserStates[userName] != oldState {
+		newText, newKeyboard :=  GenCurrentMsg(State[chatID].UserStates[userName])
+		newMsg := tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, newText, newKeyboard)
+		sendMessage(newMsg)
+	}
 	fmt.Printf("%+v\n", State)
 }
 
