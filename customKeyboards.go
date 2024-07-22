@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 	"strings"
+	"strconv"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -65,33 +66,27 @@ func GenerateMonthlyCalendar(t time.Time) tgbotapi.InlineKeyboardMarkup {
 	return dateKeyboard
 }
 
-func UpdateMonthlyCalendar(oldDateKeyboard tgbotapi.InlineKeyboardMarkup, date string) tgbotapi.InlineKeyboardMarkup {
-	lng := len(oldDateKeyboard.InlineKeyboard)
-	for i := 0; i < lng; i++ {
-		for j := 0; j < len(oldDateKeyboard.InlineKeyboard[i]); j++ {
-			if oldDateKeyboard.InlineKeyboard[i][j].Text == date {
-				prevText := oldDateKeyboard.InlineKeyboard[i][j].Text
-				oldDateKeyboard.InlineKeyboard[i][j].Text = prevText + "📌"
-				break
-			}
-		}
-	}
-	return oldDateKeyboard
-}
-
-func GenHours(timeType string) tgbotapi.InlineKeyboardMarkup {
+func GenHours(timeType string, minStartTime int) tgbotapi.InlineKeyboardMarkup {
 	var keyboard tgbotapi.InlineKeyboardMarkup
 
-	hourStrs := []string{
-		"10:00", "11:00", "12:00", "13:00",
-		"14:00", "15:00", "16:00", "17:00",
-		"18:00", "19:00", "20:00", "21:00",
+	hours := []int{
+		10, 11, 12, 13,
+		14, 15, 16, 17,
+		18, 19, 20, 21,
 	}
+
 	// Generate 3 x 4 grid
 	for i := 0; i < 3; i++ {
 		row := []tgbotapi.InlineKeyboardButton{}
 		for j := i * 4; j < i*4+4; j++ {
-			row = append(row, tgbotapi.NewInlineKeyboardButtonData(hourStrs[j], "time" + timeType + " " + hourStrs[j]))
+			timeBtnText := fmt.Sprintf("%d:00", hours[j])
+			var timeBtnData string
+			if hours[j] < minStartTime {
+				timeBtnData = "none"
+			} else {
+				timeBtnData = fmt.Sprintf("time%s %d", timeType, hours[j])
+			}
+			row = append(row, tgbotapi.NewInlineKeyboardButtonData(timeBtnText, timeBtnData))
 		}
 		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, row)
 	}
@@ -139,18 +134,6 @@ func genMonthDays(t time.Time) []int {
 	return res
 }
 
-func GenInitialMenu() tgbotapi.InlineKeyboardMarkup {
-	var keyboard tgbotapi.InlineKeyboardMarkup
-	var firstRow []tgbotapi.InlineKeyboardButton
-
-	var chooseDateBtn = tgbotapi.NewInlineKeyboardButtonData("Choose date", "Choose date")
-
-	firstRow = append(firstRow, chooseDateBtn)
-	keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, firstRow)
-	keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, Footer)
-	return keyboard
-}
-
 func GenCurrentMsg(currUserState UserState) (string, tgbotapi.InlineKeyboardMarkup) {
 	var keyboard tgbotapi.InlineKeyboardMarkup
 	var msgText string
@@ -160,18 +143,23 @@ func GenCurrentMsg(currUserState UserState) (string, tgbotapi.InlineKeyboardMark
 		msgText = month + " " + year
 		keyboard = GenerateMonthlyCalendar(time.Now())
 	} else if currUserState.TimeStart == "" {
-		msgText = "Choose starting time"
-		keyboard = GenHours("start")
+		msgText = "Pick a starting time"
+		keyboard = GenHours("start", 10)
 	} else if currUserState.TimeEnd == "" {
-		msgText = "Choose ending time"
-		keyboard = GenHours("end")
+		minTime, err := strconv.Atoi(currUserState.TimeStart)
+		if err != nil {
+			fmt.Printf("Error converting str to int: %v\n", err)
+		}
+		msgText = fmt.Sprintf("Now pick an ending time later than %s:00", currUserState.TimeStart)
+		keyboard = GenHours("end", minTime)
 	} else if currUserState.Confirmation == "" {
 		msgText = "Your selection"
 		day := strings.Fields(currUserState.Date)[2]
 		month := strings.Fields(currUserState.Date)[1]
 		year := strings.Fields(currUserState.Date)[0]
 		dateBtn := tgbotapi.NewInlineKeyboardButtonData(day + " " + month + " " + year, "none")
-		intervalBtn := tgbotapi.NewInlineKeyboardButtonData(currUserState.TimeStart + " ... " + currUserState.TimeEnd, "none")
+		intervalBtnText := fmt.Sprintf("%s:00...%s:00", currUserState.TimeStart, currUserState.TimeEnd)
+		intervalBtn := tgbotapi.NewInlineKeyboardButtonData(intervalBtnText, "none")
 		dateAndTimeRow := tgbotapi.NewInlineKeyboardRow(dateBtn, intervalBtn)
 		confirmButtonRow := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Confirm", "confirm"))
 		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, dateAndTimeRow)
