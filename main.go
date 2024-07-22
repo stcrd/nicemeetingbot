@@ -9,12 +9,14 @@ Assumptions:
 
 /*
 TODOs:
-1 - Replace keyboard when sending a reply
-2 - Make two time keyboards, for start and end: add timeStart and timeEnd instead of time in the data?
-3 - Deal with back button: maintain the state of the selection process?
-4 - Last keyboard with 'Confirm' and 'Change' buttons?
-5 - Fix adding back and forward buttons, maybe make it like a footer
-
+1 - Fix field types in UserState
+2 - Save the generated monthly calendar in cache
+3 - Fix reset command so that it does not generate a new message, but rather replaces the existing one
+4 - Summary should contain day of week in addition to the date
+5 - Implement meeting time calculation
+6 - Implement DB interaction
+7 - Dockerize
+8 - Deploy
 */
 
 import (
@@ -47,21 +49,6 @@ func GetUserState(chatID int64, userName string) UserState {
 	return State[chatID].UserStates[userName]
 }
 
-// generate updated keyboard based on the user state
-func genKeyboard(chatID int64, msgID int, userName string) tgbotapi.InlineKeyboardMarkup {
-	var msg tgbotapi.MessageConfig
-	msg.ChatID = chatID
-	// userState := GetUserState(chatID, userName)
-
-	// msgID equals 0 only after start or reset command
-	if msgID == 0 {
-		return GenInitialMenu()
-	}
-	fmt.Println(chatID, msgID, userName)
-
-	return tgbotapi.InlineKeyboardMarkup{}
-}
-
 func callbackHandler(update tgbotapi.Update) {
 	data := update.CallbackQuery.Data
 	chatID := update.CallbackQuery.From.ID
@@ -92,6 +79,10 @@ func callbackHandler(update tgbotapi.Update) {
 		userState := State[chatID].UserStates[userName]
 		userState.TimeEnd = timeEnd
 		State[chatID].UserStates[userName] = userState
+	case "confirm":
+		userState := State[chatID].UserStates[userName]
+		userState.Confirmation = "confirmed"
+		State[chatID].UserStates[userName] = userState
 	case "back":
 		userState := State[chatID].UserStates[userName]
 		if userState.Confirmation == "confirmed" {
@@ -107,10 +98,6 @@ func callbackHandler(update tgbotapi.Update) {
 			userState.Date = ""
 			State[chatID].UserStates[userName] = userState
 		}
-	case "confirm":
-		userState := State[chatID].UserStates[userName]
-		userState.Confirmation = "confirmed"
-		State[chatID].UserStates[userName] = userState
 	default:
 		text = "Unknown command"
 		msg := tgbotapi.NewMessage(chatID, text)
