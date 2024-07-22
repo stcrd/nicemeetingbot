@@ -8,22 +8,22 @@ stateDiagram
     state "Meeting time set" as MeetingTimeSet
 
     [*] --> Initial
-    Initial --> DateSelected : Date value button selected/pressed
-    DateSelected --> Initial : Back button pressed
-    DateSelected --> StartTimeSelected : Time value button selected
-    StartTimeSelected --> DateSelected : Back button pressed
-    StartTimeSelected --> EndTimeSelected : Time value button selected
-    EndTimeSelected --> StartTimeSelected : Back button pressed
-    EndTimeSelected --> Reviewing : Time value button selected
-    Reviewing --> EndTimeSelected : Back button pressed
-    Reviewing --> Confirmed : Confirm button pressed
-    Confirmed --> Reviewing : Back button pressed
-    Confirmed --> MeetingTimeSet : 'Meeting ready' message from back end
+    Initial --> DateSelected : Date
+    DateSelected --> Initial : Back
+    DateSelected --> StartTimeSelected : Time
+    StartTimeSelected --> DateSelected : Back
+    StartTimeSelected --> EndTimeSelected : Time
+    EndTimeSelected --> StartTimeSelected : Back
+    EndTimeSelected --> Reviewing : Time
+    Reviewing --> EndTimeSelected : Back
+    Reviewing --> Confirmed : Confirm
+    Confirmed --> Reviewing : Back
+    Confirmed --> MeetingTimeSet : 'Meeting ready'
 
-    Initial --> Initial : Reset button pressed
-    DateSelected --> Initial : Reset button pressed
-    StartTimeSelected --> Initial : Reset button pressed
-    EndTimeSelected --> Initial : Reset button pressed
-    Reviewing --> Initial : Reset button pressed
-    Confirmed --> Initial : Reset button pressed
-    MeetingTimeSet --> Initial : Reset button pressed
+    Initial --> Initial : Reset
+    DateSelected --> Initial : Reset
+    StartTimeSelected --> Initial : Reset
+    EndTimeSelected --> Initial : Reset
+    Reviewing --> Initial : Reset
+    Confirmed --> Initial : Reset
+    MeetingTimeSet --> Initial : Reset
