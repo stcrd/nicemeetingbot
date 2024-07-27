@@ -9,11 +9,11 @@ stateDiagram
     [*] --> Initial
     Initial --> DateSelected : Date
     DateSelected --> Initial : Back
-    DateSelected --> StartSelected : Time
+    DateSelected --> StartSelected : TimeStart
     StartSelected --> DateSelected : Back
-    StartSelected --> EndSelected : Time
+    StartSelected --> EndSelected : TimeEnd
     EndSelected --> StartSelected : Back
-    EndSelected --> Confirmed : Time
+    EndSelected --> Confirmed : Confirmed
     Confirmed --> EndSelected : Back
     Confirmed --> MeetingSet : 'Meeting ready'
 
