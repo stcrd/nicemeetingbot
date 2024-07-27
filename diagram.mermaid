@@ -1,29 +1,25 @@
 stateDiagram
-    state "Initial" as Initial
-    state "Date selected" as DateSelected
-    state "Start time selected" as StartTimeSelected
-    state "End time selected" as EndTimeSelected
-    state "Reviewing" as Reviewing
-    state "Confirmed" as Confirmed
-    state "Meeting time set" as MeetingTimeSet
+    state "initial" as Initial
+    state "dateSelected" as DateSelected
+    state "startSelected" as StartSelected
+    state "endSelected" as EndSelected
+    state "confirmed" as Confirmed
+    state "meetingSet" as MeetingSet
 
     [*] --> Initial
     Initial --> DateSelected : Date
     DateSelected --> Initial : Back
-    DateSelected --> StartTimeSelected : Time
-    StartTimeSelected --> DateSelected : Back
-    StartTimeSelected --> EndTimeSelected : Time
-    EndTimeSelected --> StartTimeSelected : Back
-    EndTimeSelected --> Reviewing : Time
-    Reviewing --> EndTimeSelected : Back
-    Reviewing --> Confirmed : Confirm
-    Confirmed --> Reviewing : Back
-    Confirmed --> MeetingTimeSet : 'Meeting ready'
+    DateSelected --> StartSelected : Time
+    StartSelected --> DateSelected : Back
+    StartSelected --> EndSelected : Time
+    EndSelected --> StartSelected : Back
+    EndSelected --> Confirmed : Time
+    Confirmed --> EndSelected : Back
+    Confirmed --> MeetingSet : 'Meeting ready'
 
     Initial --> Initial : Reset
     DateSelected --> Initial : Reset
-    StartTimeSelected --> Initial : Reset
-    EndTimeSelected --> Initial : Reset
-    Reviewing --> Initial : Reset
+    StartSelected --> Initial : Reset
+    EndSelected --> Initial : Reset
     Confirmed --> Initial : Reset
-    MeetingTimeSet --> Initial : Reset
+    MeetingSet --> Initial : Reset
