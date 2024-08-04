@@ -20,10 +20,11 @@ TODOs:
 */
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
-	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
@@ -31,12 +32,22 @@ import (
 
 var bot *tgbotapi.BotAPI
 var dateKeyboard tgbotapi.InlineKeyboardMarkup
+const (
+	dateLayout = "2006-01-02"
+	timeLayout = "15:04"
+)
+
+type Event struct {
+	Name string `json:"name"`
+	Data string `json:"data"`
+}
 
 type UserState struct {
-	Date string
-	TimeStart string
-	TimeEnd string
-	Confirmation string
+	Name string // initial, dateSelected, startSelected, endSelected, confirmed, meetingSet
+	Date time.Time
+	TimeStart time.Time
+	TimeEnd time.Time
+	Confirmation bool
 }
 
 type ChatState struct {
@@ -45,65 +56,69 @@ type ChatState struct {
 
 var State = make(map[int64]ChatState) // chatId > ChatState
 
-func GetUserState(chatID int64, userName string) UserState {
-	return State[chatID].UserStates[userName]
-}
-
 func callbackHandler(update tgbotapi.Update) {
 	data := update.CallbackQuery.Data
 	chatID := update.CallbackQuery.From.ID
 	userName := update.CallbackQuery.From.UserName
 	msgID := update.CallbackQuery.Message.MessageID
-	var text string
 	var msg tgbotapi.MessageConfig
 	msg.ChatID = chatID
-	firstPart := strings.Fields(data)[0]
+	var event Event
+	if err := json.Unmarshal([]byte(data), &event); err != nil {
+		log.Printf("Unmarshal error: %v\n", err)
+		return
+	}
 	oldState := State[chatID].UserStates[userName]
+	userState := State[chatID].UserStates[userName]
 
-	switch firstPart {
+	// fix errors below, unmarshall etc.
+	switch event.Name {
 	case "none": // handling this case to make buttons inactive
 	case "date":
-		year := strings.Fields(data)[1]
-		month := strings.Fields(data)[2]
-		day := strings.Fields(data)[3]
-		State[chatID].UserStates[userName] = UserState{
-			Date: fmt.Sprintf("%s %s %s", year, month, day),
+		dateReceived, err := time.Parse(dateLayout, event.Data)
+		if err != nil {
+			log.Printf("Error parsing date: %v\n", err)
 		}
+		userState.Date = dateReceived
+		userState.Name = "dateSelected"
 	case "timestart":
-		timeStart := strings.Fields(data)[1]
-		userState := State[chatID].UserStates[userName]
+		timeStart, err := time.Parse(timeLayout, event.Data)
+		if err != nil {
+			log.Printf("Error parsing timestart: %v\n", err)
+		}
 		userState.TimeStart = timeStart
-		State[chatID].UserStates[userName] = userState
+		userState.Name = "startSelected"
 	case "timeend":
-		timeEnd := strings.Fields(data)[1]
-		userState := State[chatID].UserStates[userName]
+		timeEnd, err := time.Parse(timeLayout, event.Data)
+		if err != nil {
+			log.Printf("Error parsing timeend: %v\n", err)
+		}
 		userState.TimeEnd = timeEnd
-		State[chatID].UserStates[userName] = userState
+		userState.Name = "endSelected"
 	case "confirm":
-		userState := State[chatID].UserStates[userName]
-		userState.Confirmation = "confirmed"
-		State[chatID].UserStates[userName] = userState
+		userState.Confirmation = true
+		userState.Name = "confirmed"
 	case "back":
-		userState := State[chatID].UserStates[userName]
-		if userState.Confirmation == "confirmed" {
-			userState.Confirmation = ""
-			State[chatID].UserStates[userName] = userState
-		} else if userState.TimeEnd != "" {
-			userState.TimeEnd = ""
-			State[chatID].UserStates[userName] = userState
-		} else if userState.TimeStart != "" {
-			userState.TimeStart = ""
-			State[chatID].UserStates[userName] = userState
-		} else if userState.Date != "" {
-			userState.Date = ""
-			State[chatID].UserStates[userName] = userState
+		switch userState.Name {
+		case "confirmed":
+			userState.Confirmation = false
+			userState.Name = "endSelected"
+		case "endSelected":
+			userState.TimeEnd = time.Time{}
+			userState.Name = "startSelected"
+		case "startSelected":
+			userState.TimeStart = time.Time{}
+			userState.Name = "dateSelected"
+		case "dateSelected":
+			userState.Date = time.Time{}
+			userState.Name = "initial"
+		case "initial": // nothing happens
 		}
 	default:
-		text = "Unknown command"
-		msg := tgbotapi.NewMessage(chatID, text)
-		sendMessage(msg)
+		log.Printf("Unknown command from user %s in chat %d\n", userName, chatID)
 	}
-	if State[chatID].UserStates[userName] != oldState {
+	if userState != oldState {
+		State[chatID].UserStates[userName] = userState
 		newText, newKeyboard :=  GenCurrentMsg(State[chatID].UserStates[userName])
 		newMsg := tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, newText, newKeyboard)
 		sendMessage(newMsg)
@@ -135,7 +150,7 @@ func commandHandler(update tgbotapi.Update) {
 
 func sendMessage(msg tgbotapi.Chattable) {
 	if _, err := bot.Send(msg); err != nil {
-		log.Panicf("Send message error: %v", err)
+		log.Printf("Send message error: %v", err)
 	}
 }
 
@@ -143,14 +158,14 @@ func main() {
 	// load .env and get the bot token
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Println("Error loading .env file")
 	}
 	tgToken := os.Getenv("TG_TOKEN")
 
 	// initialize the bot
 	bot, err = tgbotapi.NewBotAPI(tgToken)
 	if err != nil {
-		log.Panic(err)
+		log.Printf("Error initializing the bot: %v\n", err)
 	}
 
 	// create updates channel
@@ -158,7 +173,7 @@ func main() {
 	u.Timeout = 60
 	updates := bot.GetUpdatesChan(u)
 	if err != nil {
-		log.Fatalf("Failed to start listening for updates %v", err)
+		log.Printf("Failed to start listening for updates %v", err)
 	}
 
 	// listen to updates from the channel

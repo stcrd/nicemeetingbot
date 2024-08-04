@@ -3,23 +3,34 @@ package main
 import (
 	"fmt"
 	"time"
-	"strings"
-	"strconv"
+	"encoding/json"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
  // { year: { month: calendar } }
-var calendarCache = make(map[string]map[string]tgbotapi.InlineKeyboardMarkup)
+var calendarCache = make(map[int]map[time.Month]tgbotapi.InlineKeyboardMarkup)
 
-var BackBtn = tgbotapi.NewInlineKeyboardButtonData("Back", "back")
-var Footer = tgbotapi.NewInlineKeyboardRow(BackBtn)
+var Footer = tgbotapi.NewInlineKeyboardRow(GenerateBackBtn())
+var NoneEvent = `{"name":"none","data":"none"}`
+
+func GenerateBackBtn() tgbotapi.InlineKeyboardButton {
+	var backEvent Event
+	backEvent.Name = "back"
+	backEvent.Data = "back"
+	backJsonData, err := json.Marshal(&backEvent)
+	if err != nil {
+		fmt.Errorf("Error marshaling back button: %v", err)
+	}
+	backBtnData := string(backJsonData)
+	return tgbotapi.NewInlineKeyboardButtonData("Back", backBtnData)
+}
 
 func GenerateMonthlyCalendar(t time.Time) tgbotapi.InlineKeyboardMarkup {
 	var dateKeyboard tgbotapi.InlineKeyboardMarkup
 	var text, data string
-	year := fmt.Sprint(t.Year())
-	month := t.Month().String()
+	year := t.Year()
+	month := t.Month()
 
 	// if already exists in the cache map, just return it
 	if monthCalendar, exists := calendarCache[year][month]; exists {
@@ -35,23 +46,30 @@ func GenerateMonthlyCalendar(t time.Time) tgbotapi.InlineKeyboardMarkup {
 	weekdays := []tgbotapi.InlineKeyboardButton{}
 	dayNames := []string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"}
 	for i := range dayNames {
-		weekdays = append(weekdays, tgbotapi.NewInlineKeyboardButtonData(dayNames[i], "none"))
+		weekdays = append(weekdays, tgbotapi.NewInlineKeyboardButtonData(dayNames[i], NoneEvent))
 	}
 	dateKeyboard.InlineKeyboard = append(dateKeyboard.InlineKeyboard, weekdays)
 
+	var event Event
+	event.Name = "date"
 	for i := 0; i < rowCount; i++ {
 		row := []tgbotapi.InlineKeyboardButton{}
 		for j := 1; j <= columnCount && dayIndex < len(cells); j++ {
 			if cells[dayIndex] != 0 {
 				text = fmt.Sprint(cells[dayIndex])
 				if cells[dayIndex] >= currDayOfMonth {
-					data = fmt.Sprintf("date %s %s %s", year, month, text)
+					event.Data = fmt.Sprintf("%d-%02d-%s", year, month, text)
+					jsonData, err := json.Marshal(&event)
+					if err != nil {
+						fmt.Errorf("Error marshaling date event: %v", err)
+					}
+					data = string(jsonData)
 				} else {
-					data = "none"
+					data = NoneEvent
 				}
 			} else {
 				text = " "
-				data = "none"
+				data = NoneEvent
 			}
 			btn := tgbotapi.NewInlineKeyboardButtonData(text, data)
 			row = append(row, btn)
@@ -60,7 +78,7 @@ func GenerateMonthlyCalendar(t time.Time) tgbotapi.InlineKeyboardMarkup {
 		dateKeyboard.InlineKeyboard = append(dateKeyboard.InlineKeyboard, row)
 	}
 	if _, exists := calendarCache[year]; !exists {
-		calendarCache[year] = make(map[string]tgbotapi.InlineKeyboardMarkup)
+		calendarCache[year] = make(map[time.Month]tgbotapi.InlineKeyboardMarkup)
 	}
 	calendarCache[year][month] = dateKeyboard
 	return dateKeyboard
@@ -76,15 +94,22 @@ func GenHours(timeType string, minStartTime int) tgbotapi.InlineKeyboardMarkup {
 	}
 
 	// Generate 3 x 4 grid
+	var event Event
+	event.Name = fmt.Sprintf("time%s", timeType)
 	for i := 0; i < 3; i++ {
 		row := []tgbotapi.InlineKeyboardButton{}
 		for j := i * 4; j < i*4+4; j++ {
 			timeBtnText := fmt.Sprintf("%d:00", hours[j])
 			var timeBtnData string
 			if hours[j] < minStartTime {
-				timeBtnData = "none"
+				timeBtnData = NoneEvent
 			} else {
-				timeBtnData = fmt.Sprintf("time%s %d", timeType, hours[j])
+				event.Data = timeBtnText
+				jsonData, err := json.Marshal(&event)
+				if err != nil {
+					fmt.Errorf("Error marshaling time %s event: %v", timeType, err)
+				}
+				timeBtnData = string(jsonData) 
 			}
 			row = append(row, tgbotapi.NewInlineKeyboardButtonData(timeBtnText, timeBtnData))
 		}
@@ -137,36 +162,43 @@ func genMonthDays(t time.Time) []int {
 func GenCurrentMsg(currUserState UserState) (string, tgbotapi.InlineKeyboardMarkup) {
 	var keyboard tgbotapi.InlineKeyboardMarkup
 	var msgText string
-	if currUserState.Date == "" {
+	if currUserState.Date.IsZero() {
 		year := fmt.Sprint(time.Now().Year())
 		month := time.Now().Month().String()
 		msgText = month + " " + year
 		keyboard = GenerateMonthlyCalendar(time.Now())
-	} else if currUserState.TimeStart == "" {
+	} else if currUserState.TimeStart.IsZero() {
 		msgText = "Pick a starting time"
 		keyboard = GenHours("start", 10)
-	} else if currUserState.TimeEnd == "" {
-		minTime, err := strconv.Atoi(currUserState.TimeStart)
-		if err != nil {
-			fmt.Printf("Error converting str to int: %v\n", err)
-		}
-		msgText = fmt.Sprintf("Now pick an ending time later than %s:00", currUserState.TimeStart)
+	} else if currUserState.TimeEnd.IsZero() {
+		minTime := currUserState.TimeStart.Hour()
+		msgText = fmt.Sprint("Now pick an ending time later than: ", currUserState.TimeStart.Format(timeLayout))
 		keyboard = GenHours("end", minTime)
-	} else if currUserState.Confirmation == "" {
+	} else if !currUserState.Confirmation {
 		msgText = "Your selection"
-		day := strings.Fields(currUserState.Date)[2]
-		month := strings.Fields(currUserState.Date)[1]
-		year := strings.Fields(currUserState.Date)[0]
-		dateBtn := tgbotapi.NewInlineKeyboardButtonData(day + " " + month + " " + year, "none")
-		intervalBtnText := fmt.Sprintf("%s:00...%s:00", currUserState.TimeStart, currUserState.TimeEnd)
-		intervalBtn := tgbotapi.NewInlineKeyboardButtonData(intervalBtnText, "none")
+		day := currUserState.Date.Day()
+		month := currUserState.Date.Month().String()
+		year := currUserState.Date.Year()
+		dateStr := fmt.Sprintf("%d-%s-%d", day, month, year)
+		dateBtn := tgbotapi.NewInlineKeyboardButtonData(dateStr, NoneEvent)
+		intervalBtnText := fmt.Sprintf("%s...%s", currUserState.TimeStart.Format(timeLayout), currUserState.TimeEnd.Format(timeLayout))
+		intervalBtn := tgbotapi.NewInlineKeyboardButtonData(intervalBtnText, NoneEvent)
 		dateAndTimeRow := tgbotapi.NewInlineKeyboardRow(dateBtn, intervalBtn)
-		confirmButtonRow := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Confirm", "confirm"))
+
+		var event Event
+		event.Name = "confirm"
+		event.Data = "confirm"
+		jsonData, err := json.Marshal(&event)
+		if err != nil {
+			fmt.Errorf("Error marshaling confirm: %v", err)
+		}
+		confirmBtnData := string(jsonData)
+		confirmButtonRow := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Confirm", confirmBtnData ))
 		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, dateAndTimeRow)
 		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, confirmButtonRow)
-	} else if currUserState.Confirmation == "confirmed" {
+	} else if currUserState.Confirmation {
 		msgText = "Waiting for other participants..."	
-		hourglassBtn := tgbotapi.NewInlineKeyboardButtonData("⏳🤖⏳", "none")
+		hourglassBtn := tgbotapi.NewInlineKeyboardButtonData("⏳🤖⏳", NoneEvent)
 		hourglassRow := tgbotapi.NewInlineKeyboardRow(hourglassBtn)
 		keyboard.InlineKeyboard = append(keyboard.InlineKeyboard, hourglassRow)
 	}
