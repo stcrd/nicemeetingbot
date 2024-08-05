@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 	"encoding/json"
+	"log"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -20,7 +21,7 @@ func GenerateBackBtn() tgbotapi.InlineKeyboardButton {
 	backEvent.Data = "back"
 	backJsonData, err := json.Marshal(&backEvent)
 	if err != nil {
-		fmt.Errorf("Error marshaling back button: %v", err)
+		log.Printf("Error marshaling back button: %v", err)
 	}
 	backBtnData := string(backJsonData)
 	return tgbotapi.NewInlineKeyboardButtonData("Back", backBtnData)
@@ -58,10 +59,10 @@ func GenerateMonthlyCalendar(t time.Time) tgbotapi.InlineKeyboardMarkup {
 			if cells[dayIndex] != 0 {
 				text = fmt.Sprint(cells[dayIndex])
 				if cells[dayIndex] >= currDayOfMonth {
-					event.Data = fmt.Sprintf("%d-%02d-%s", year, month, text)
+					event.Data = fmt.Sprintf("%d-%02d-%02d", year, month, cells[dayIndex])
 					jsonData, err := json.Marshal(&event)
 					if err != nil {
-						fmt.Errorf("Error marshaling date event: %v", err)
+						log.Printf("Error marshaling date event: %v", err)
 					}
 					data = string(jsonData)
 				} else {
@@ -107,7 +108,7 @@ func GenHours(timeType string, minStartTime int) tgbotapi.InlineKeyboardMarkup {
 				event.Data = timeBtnText
 				jsonData, err := json.Marshal(&event)
 				if err != nil {
-					fmt.Errorf("Error marshaling time %s event: %v", timeType, err)
+					log.Printf("Error marshaling time %s event: %v", timeType, err)
 				}
 				timeBtnData = string(jsonData) 
 			}
@@ -190,7 +191,7 @@ func GenCurrentMsg(currUserState UserState) (string, tgbotapi.InlineKeyboardMark
 		event.Data = "confirm"
 		jsonData, err := json.Marshal(&event)
 		if err != nil {
-			fmt.Errorf("Error marshaling confirm: %v", err)
+			log.Printf("Error marshaling confirm: %v", err)
 		}
 		confirmBtnData := string(jsonData)
 		confirmButtonRow := tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Confirm", confirmBtnData ))

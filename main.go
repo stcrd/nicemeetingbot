@@ -44,6 +44,7 @@ type Event struct {
 
 type UserState struct {
 	Name string // initial, dateSelected, startSelected, endSelected, confirmed, meetingSet
+	MsgID int // to make start and reset not send a new message
 	Date time.Time
 	TimeStart time.Time
 	TimeEnd time.Time
@@ -130,19 +131,38 @@ func commandHandler(update tgbotapi.Update) {
 	command := update.Message.Command()
 	userName := update.Message.From.UserName
 	chatID := update.Message.Chat.ID
-	// msgID := update.Message.MessageID
-	var msg tgbotapi.MessageConfig
-	msg.ChatID = chatID
 
-	switch  {
+	switch {
 	case command == "start" || command == "reset":
-		userStates := make(map[string]UserState)
-		State[chatID] = ChatState{UserStates: userStates}
-		State[chatID].UserStates[userName] = UserState{} // initiate the userName key in the map
-		newText, newKeyboard := GenCurrentMsg(State[chatID].UserStates[userName])
-		msg.Text = newText
-		msg.ReplyMarkup = newKeyboard
-		sendMessage(msg)
+		if _, exists := State[chatID]; !exists {
+			userStates := make(map[string]UserState)
+			State[chatID] = ChatState{UserStates: userStates}
+			State[chatID].UserStates[userName] = UserState{} // initiate the userName key in the map
+		}
+
+		userState := State[chatID].UserStates[userName]
+		if userState.MsgID == 0 {
+			var msg tgbotapi.MessageConfig
+			msg.ChatID = chatID
+			newText, newKeyboard := GenCurrentMsg(State[chatID].UserStates[userName])
+			msg.Text = newText
+			msg.ReplyMarkup = newKeyboard
+			msgRes, err := bot.Send(msg)
+			if err != nil {
+				log.Printf("Send message error: %v", err)
+			}
+			userState.MsgID = msgRes.MessageID
+			State[chatID].UserStates[userName] = userState
+		} else {
+			userState.Name = "initial"
+			userState.Date = time.Time{} 
+			userState.TimeStart = time.Time{}
+			userState.TimeEnd = time.Time{}
+			State[chatID].UserStates[userName] = userState
+			newText, newKeyboard :=  GenCurrentMsg(State[chatID].UserStates[userName])
+			newMsg := tgbotapi.NewEditMessageTextAndMarkup(chatID, userState.MsgID, newText, newKeyboard)
+			sendMessage(newMsg)
+		}
 	default:
 		sendMessage(tgbotapi.NewMessage(chatID, "Unknown command"))
 	}
